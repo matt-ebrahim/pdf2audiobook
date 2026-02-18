@@ -132,7 +132,9 @@ def _generate_summary_text(
         )
         result = response.choices[0].message.content
         return result.strip() if result else _extractive_fallback(chapters)
-    except Exception:
+    except Exception as exc:
+        import sys
+        print(f"[summary] LLM call failed ({exc}), using extractive fallback", file=sys.stderr)
         return _extractive_fallback(chapters)
 
 

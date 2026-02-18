@@ -23,6 +23,27 @@ app = FastAPI(title="pdf2audiobook")
 
 UPLOAD_DIR = Path("uploads")
 
+# ── Global Configuration ────────────────────────────────────
+
+_config: Any = None  # Loaded at startup
+
+
+def _load_global_config() -> Any:
+    """Load config from config.toml if present, otherwise defaults."""
+    from pdf2audiobook.config import load_config
+
+    for candidate in (Path("config.toml"), Path.home() / ".pdf2audiobook" / "config.toml"):
+        if candidate.exists():
+            return load_config(candidate)
+    return load_config()
+
+
+def _get_config() -> Any:
+    global _config
+    if _config is None:
+        _config = _load_global_config()
+    return _config
+
 
 @dataclass
 class ChapterInfo:
@@ -64,6 +85,66 @@ def _push_event(job: Job, event: str, data: dict[str, Any]) -> None:
 async def index():
     static_path = Path(__file__).parent / "static" / "index.html"
     return HTMLResponse(static_path.read_text(encoding="utf-8"))
+
+
+@app.get("/settings")
+async def get_settings():
+    """Return current settings (API keys masked)."""
+    cfg = _get_config()
+
+    def mask(key: str) -> str:
+        if not key:
+            return ""
+        if len(key) <= 8:
+            return "***"
+        return key[:4] + "..." + key[-4:]
+
+    return JSONResponse({
+        "llm_model": cfg.clean.llm_model,
+        "llm_backend": cfg.clean.llm_backend,
+        "tts_engine": cfg.synth.tts_engine,
+        "voice": cfg.synth.voice,
+        "api_keys": {
+            "openai": mask(cfg.api_keys.openai),
+            "anthropic": mask(cfg.api_keys.anthropic),
+            "elevenlabs": mask(cfg.api_keys.elevenlabs),
+        },
+    })
+
+
+@app.post("/settings")
+async def update_settings(body: dict):
+    """Update runtime settings (API keys, LLM model, TTS engine)."""
+    cfg = _get_config()
+
+    if "llm_model" in body and body["llm_model"]:
+        cfg.clean.llm_model = body["llm_model"]
+    if "llm_backend" in body:
+        cfg.clean.llm_backend = body["llm_backend"]
+    if "tts_engine" in body and body["tts_engine"]:
+        cfg.synth.tts_engine = body["tts_engine"]
+    if "voice" in body and body["voice"]:
+        cfg.synth.voice = body["voice"]
+
+    # Only update API keys if a new non-masked value is provided
+    keys = body.get("api_keys", {})
+    if keys.get("openai") and "..." not in keys["openai"]:
+        cfg.api_keys.openai = keys["openai"]
+    if keys.get("anthropic") and "..." not in keys["anthropic"]:
+        cfg.api_keys.anthropic = keys["anthropic"]
+    if keys.get("elevenlabs") and "..." not in keys["elevenlabs"]:
+        cfg.api_keys.elevenlabs = keys["elevenlabs"]
+
+    # Also push API keys into environment so litellm picks them up
+    import os
+    if cfg.api_keys.openai:
+        os.environ["OPENAI_API_KEY"] = cfg.api_keys.openai
+    if cfg.api_keys.anthropic:
+        os.environ["ANTHROPIC_API_KEY"] = cfg.api_keys.anthropic
+    if cfg.api_keys.elevenlabs:
+        os.environ["ELEVENLABS_API_KEY"] = cfg.api_keys.elevenlabs
+
+    return JSONResponse({"status": "ok"})
 
 
 @app.post("/upload")
@@ -247,7 +328,6 @@ async def get_pdf(job_id: str):
 def _run_job(job: Job) -> None:
     """Run the full pipeline in a background thread."""
     from pdf2audiobook.checkpoint import Checkpoint
-    from pdf2audiobook.config import load_config
     from pdf2audiobook.progress import Progress
 
     try:
@@ -259,7 +339,7 @@ def _run_job(job: Job) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         job.output_dir = output_dir
 
-        config = load_config()
+        config = _get_config()
 
         def on_event(event: str, data: dict[str, Any]) -> None:
             if event == "chapter_stage":

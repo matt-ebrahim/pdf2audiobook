@@ -74,6 +74,57 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   min-height: 1.5em;
 }
 
+/* ── Settings Panel ── */
+.settings-panel {
+  width: 100%; max-width: 480px; margin-top: 1.5rem;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.settings-toggle {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.75rem 1rem; width: 100%; font-size: 0.85rem;
+  font-weight: 500; color: var(--text-secondary);
+  transition: color 0.15s;
+}
+.settings-toggle:hover { color: var(--text-primary); }
+.settings-toggle svg { width: 16px; height: 16px; fill: currentColor; }
+.settings-toggle .arrow {
+  margin-left: auto; transition: transform 0.2s;
+}
+.settings-toggle.open .arrow { transform: rotate(180deg); }
+.settings-body {
+  padding: 0 1rem 1rem; display: none;
+}
+.settings-body.open { display: block; }
+.settings-row {
+  display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.85rem;
+}
+.settings-row:last-child { margin-bottom: 0; }
+.settings-row label {
+  font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.settings-row input, .settings-row select {
+  width: 100%; padding: 0.5rem 0.65rem; font-size: 0.85rem;
+  background: var(--bg-base); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text-primary);
+  font-family: inherit; outline: none; transition: border-color 0.15s;
+}
+.settings-row input:focus, .settings-row select:focus {
+  border-color: var(--accent);
+}
+.settings-row input::placeholder { color: var(--text-muted); }
+.settings-row select { cursor: pointer; }
+.settings-row select option { background: var(--bg-elevated); }
+.settings-row .hint {
+  font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem;
+}
+.settings-saved {
+  font-size: 0.8rem; color: var(--green); text-align: center;
+  padding: 0.4rem; opacity: 0; transition: opacity 0.3s;
+}
+.settings-saved.show { opacity: 1; }
+
 /* ── App Layout ── */
 .app-screen {
   display: grid; height: 100vh;
@@ -280,6 +331,43 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
     <input type="file" id="fileInput" accept=".pdf">
   </div>
   <div class="upload-status" id="uploadStatus"></div>
+
+  <div class="settings-panel">
+    <button class="settings-toggle" id="settingsToggle" onclick="toggleSettings()">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>
+      Settings
+      <svg class="arrow" viewBox="0 0 24 24" width="14" height="14"><path d="M7 10l5 5 5-5z"/></svg>
+    </button>
+    <div class="settings-body" id="settingsBody">
+      <div class="settings-row">
+        <label>LLM Model (for cleaning & summary)</label>
+        <input type="text" id="settLlmModel" placeholder="gpt-4o-mini">
+        <span class="hint">LiteLLM format: gpt-4o-mini, claude-sonnet-4-20250514, gemini/gemini-2.0-flash, etc.</span>
+      </div>
+      <div class="settings-row">
+        <label>OpenAI API Key</label>
+        <input type="password" id="settOpenaiKey" placeholder="sk-...">
+      </div>
+      <div class="settings-row">
+        <label>Anthropic API Key</label>
+        <input type="password" id="settAnthropicKey" placeholder="sk-ant-...">
+      </div>
+      <div class="settings-row">
+        <label>TTS Engine</label>
+        <select id="settTtsEngine">
+          <option value="kokoro">Kokoro (local, free)</option>
+          <option value="openai">OpenAI TTS (API)</option>
+          <option value="elevenlabs">ElevenLabs (API)</option>
+          <option value="chatterbox">Chatterbox (local)</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label>ElevenLabs API Key</label>
+        <input type="password" id="settElevenlabsKey" placeholder="xi-...">
+      </div>
+      <div class="settings-saved" id="settingsSaved">Settings saved</div>
+    </div>
+  </div>
 </div>
 
 <!-- ── App Screen ── -->
@@ -372,6 +460,68 @@ const pdfViewer = $('pdfViewer');
 const pdfFrame = $('pdfFrame');
 const playerBar = $('playerBar');
 const audioEl = $('audioEl');
+
+/* ── Settings ── */
+const settingsToggle = $('settingsToggle');
+const settingsBody = $('settingsBody');
+const settLlmModel = $('settLlmModel');
+const settOpenaiKey = $('settOpenaiKey');
+const settAnthropicKey = $('settAnthropicKey');
+const settTtsEngine = $('settTtsEngine');
+const settElevenlabsKey = $('settElevenlabsKey');
+const settingsSaved = $('settingsSaved');
+let settingsDebounce = null;
+
+function toggleSettings() {
+  settingsToggle.classList.toggle('open');
+  settingsBody.classList.toggle('open');
+}
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/settings');
+    const s = await res.json();
+    settLlmModel.value = s.llm_model || '';
+    settTtsEngine.value = s.tts_engine || 'kokoro';
+    // Show masked keys as placeholders, not values
+    if (s.api_keys.openai) settOpenaiKey.placeholder = s.api_keys.openai;
+    if (s.api_keys.anthropic) settAnthropicKey.placeholder = s.api_keys.anthropic;
+    if (s.api_keys.elevenlabs) settElevenlabsKey.placeholder = s.api_keys.elevenlabs;
+  } catch {}
+}
+
+function scheduleSettingsSave() {
+  clearTimeout(settingsDebounce);
+  settingsDebounce = setTimeout(saveSettings, 600);
+}
+
+async function saveSettings() {
+  const body = {
+    llm_model: settLlmModel.value.trim(),
+    tts_engine: settTtsEngine.value,
+    api_keys: {},
+  };
+  if (settOpenaiKey.value.trim()) body.api_keys.openai = settOpenaiKey.value.trim();
+  if (settAnthropicKey.value.trim()) body.api_keys.anthropic = settAnthropicKey.value.trim();
+  if (settElevenlabsKey.value.trim()) body.api_keys.elevenlabs = settElevenlabsKey.value.trim();
+  try {
+    await fetch('/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    settingsSaved.classList.add('show');
+    setTimeout(() => settingsSaved.classList.remove('show'), 2000);
+  } catch {}
+}
+
+[settLlmModel, settOpenaiKey, settAnthropicKey, settElevenlabsKey, settTtsEngine].forEach(el => {
+  el.addEventListener('input', scheduleSettingsSave);
+  el.addEventListener('change', scheduleSettingsSave);
+});
+
+// Load settings on page load
+loadSettings();
 
 /* ── Upload ── */
 uploadArea.addEventListener('click', () => fileInput.click());
