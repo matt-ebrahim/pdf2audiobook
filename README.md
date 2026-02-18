@@ -11,6 +11,8 @@ The pipeline runs four stages:
 3. **Chunk** — Split cleaned text into sentence-boundary-respecting chunks using spaCy
 4. **Synthesize** — Generate audio with parallel TTS, stitch chapters, and produce a final M4B (with chapter markers) or MP3
 
+Between parsing and the streaming stages, the pipeline generates an **executive summary** of the entire document via LLM and injects it as the first chapter. This gives listeners a high-level overview before diving into the full content.
+
 Stages 2–4 run as a **streaming pipeline**: while one thread synthesizes Chapter 0 (CPU-heavy), another cleans Chapter 1 via LLM (I/O-heavy). Audio becomes available chapter-by-chapter instead of waiting for the entire book.
 
 ## Quick start
@@ -123,6 +125,7 @@ src/pdf2audiobook/
 ├── cli.py              # Command-line interface
 ├── webapp.py           # FastAPI web application
 ├── pipeline.py         # Main pipeline orchestrator
+├── summary.py          # Executive summary generation via LLM
 ├── streaming.py        # Streaming pipeline (concurrent chapter processing)
 ├── checkpoint.py       # Checkpoint/resume system
 ├── progress.py         # Progress reporting with SSE event support
