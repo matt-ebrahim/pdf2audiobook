@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pdf2audiobook</title>
+<style>
+:root {
+  --bg-base: #0c0d12;
+  --bg-surface: #14151c;
+  --bg-elevated: #1c1d27;
+  --bg-hover: #23242f;
+  --border: #2a2b38;
+  --border-light: #353648;
+  --text-primary: #e8e9f0;
+  --text-secondary: #8889a0;
+  --text-muted: #5c5d72;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --red: #f87171;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-base); color: var(--text-primary);
+  height: 100vh; overflow: hidden;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+.hidden { display: none !important; }
+
+/* ── Upload Screen ── */
+.upload-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; padding: 2rem;
+}
+.upload-brand { margin-bottom: 2.5rem; text-align: center; }
+.upload-brand h1 {
+  font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--accent-hover), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.upload-brand p { color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.35rem; }
+.upload-area {
+  width: 100%; max-width: 480px; border: 2px dashed var(--border);
+  border-radius: var(--radius-lg); padding: 3.5rem 2rem; text-align: center;
+  cursor: pointer; transition: all 0.25s ease; background: var(--bg-surface);
+}
+.upload-area:hover, .upload-area.dragover {
+  border-color: var(--accent); background: var(--accent-glow);
+  transform: translateY(-2px);
+}
+.upload-icon {
+  width: 56px; height: 56px; margin: 0 auto 1rem;
+  border-radius: 50%; background: var(--accent-glow);
+  display: flex; align-items: center; justify-content: center;
+}
+.upload-icon svg { width: 26px; height: 26px; fill: var(--accent-hover); }
+.upload-area h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.35rem; }
+.upload-area p { font-size: 0.85rem; color: var(--text-secondary); }
+.upload-area input { display: none; }
+.upload-status {
+  margin-top: 1.25rem; font-size: 0.85rem; color: var(--text-secondary);
+  min-height: 1.5em;
+}
+
+/* ── App Layout ── */
+.app-screen {
+  display: grid; height: 100vh;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: 320px 1fr;
+}
+.app-header {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem;
+  padding: 0.75rem 1.25rem; background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+.header-brand {
+  font-size: 0.95rem; font-weight: 700; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--accent-hover), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-right: auto;
+}
+.header-filename {
+  font-size: 0.8rem; color: var(--text-secondary);
+  max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.header-status {
+  font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 99px;
+  background: var(--accent-glow); color: var(--accent-hover);
+}
+.header-status.complete { background: rgba(52,211,153,0.12); color: var(--green); }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.85rem; border-radius: var(--radius); font-size: 0.8rem;
+  font-weight: 500; transition: all 0.15s ease;
+}
+.btn-accent {
+  background: var(--accent); color: #fff;
+}
+.btn-accent:hover { background: var(--accent-hover); }
+.btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn svg { width: 15px; height: 15px; fill: currentColor; }
+
+/* ── Sidebar ── */
+.sidebar {
+  grid-row: 2; grid-column: 1; overflow-y: auto;
+  border-right: 1px solid var(--border); background: var(--bg-surface);
+  padding: 0.5rem;
+}
+.sidebar-title {
+  padding: 0.6rem 0.75rem 0.4rem; font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+}
+.ch-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.6rem 0.75rem; border-radius: var(--radius);
+  cursor: default; transition: all 0.15s ease; position: relative;
+}
+.ch-item.clickable { cursor: pointer; }
+.ch-item.clickable:hover { background: var(--bg-hover); }
+.ch-item.playing { background: var(--accent-glow); }
+.ch-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  transition: background 0.3s;
+}
+.ch-dot.pending { background: var(--text-muted); }
+.ch-dot.cleaning { background: var(--yellow); animation: pulse 1.2s ease infinite; }
+.ch-dot.chunking { background: var(--purple); animation: pulse 1.2s ease infinite; }
+.ch-dot.synthesizing { background: var(--blue); animation: pulse 1.2s ease infinite; }
+.ch-dot.ready { background: var(--green); }
+.ch-dot.error { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+.audio-bars {
+  display: flex; align-items: flex-end; gap: 2px; height: 14px; flex-shrink: 0;
+}
+.audio-bars span {
+  display: block; width: 2.5px; background: var(--accent-hover);
+  border-radius: 1px; animation: bar 0.8s ease infinite;
+}
+.audio-bars span:nth-child(1) { animation-delay: 0s; }
+.audio-bars span:nth-child(2) { animation-delay: 0.2s; }
+.audio-bars span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bar { 0%,100%{height:4px} 50%{height:14px} }
+
+.ch-title {
+  flex: 1; font-size: 0.85rem; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary);
+}
+.ch-status {
+  font-size: 0.7rem; color: var(--text-muted); text-transform: capitalize;
+  flex-shrink: 0;
+}
+.ch-actions { display: flex; gap: 0.15rem; flex-shrink: 0; }
+.ch-actions button {
+  padding: 0.3rem; border-radius: 4px; opacity: 0.5; transition: all 0.15s;
+}
+.ch-actions button:hover { opacity: 1; background: var(--bg-hover); }
+.ch-actions svg { width: 14px; height: 14px; fill: var(--text-secondary); }
+
+/* ── Content (Reader / PDF) ── */
+.content { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; overflow: hidden; }
+.content-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  background: var(--bg-surface); flex-shrink: 0;
+}
+.tab-btn {
+  padding: 0.65rem 1.25rem; font-size: 0.8rem; font-weight: 500;
+  color: var(--text-secondary); border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { color: var(--accent-hover); border-bottom-color: var(--accent); }
+.content-body { flex: 1; overflow: hidden; position: relative; }
+
+/* Text reader */
+.text-reader {
+  height: 100%; overflow-y: auto; padding: 2rem 3rem 3rem;
+  max-width: 740px; margin: 0 auto;
+}
+.reader-title {
+  font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;
+  color: var(--text-primary); letter-spacing: -0.01em;
+}
+.reader-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; color: var(--text-muted); text-align: center; padding: 2rem;
+}
+.reader-placeholder svg { width: 48px; height: 48px; fill: var(--border); margin-bottom: 1rem; }
+.reader-placeholder p { font-size: 0.9rem; }
+.paragraph {
+  font-size: 0.95rem; line-height: 1.75; color: var(--text-secondary);
+  margin-bottom: 1.25rem; padding: 0.5rem 0.75rem;
+  border-left: 3px solid transparent; border-radius: 2px;
+  transition: all 0.35s ease;
+}
+.paragraph.active {
+  color: var(--text-primary); background: var(--accent-glow);
+  border-left-color: var(--accent);
+}
+
+/* PDF viewer */
+.pdf-viewer { height: 100%; }
+.pdf-viewer iframe { width: 100%; height: 100%; border: none; }
+
+/* ── Player Bar ── */
+.player-bar {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem;
+  padding: 0.6rem 1.25rem; background: rgba(20, 21, 28, 0.9);
+  backdrop-filter: blur(20px); border-top: 1px solid var(--border);
+  min-height: 64px;
+}
+.player-bar.empty { justify-content: center; }
+.player-bar.empty .player-empty-msg {
+  font-size: 0.8rem; color: var(--text-muted);
+}
+.transport { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+.transport button {
+  padding: 0.45rem; border-radius: 50%; transition: all 0.15s;
+}
+.transport button:hover { background: var(--bg-hover); }
+.transport svg { width: 18px; height: 18px; fill: var(--text-primary); }
+.play-btn {
+  width: 40px !important; height: 40px; display: flex; align-items: center;
+  justify-content: center; border-radius: 50% !important;
+  background: var(--accent) !important;
+}
+.play-btn:hover { background: var(--accent-hover) !important; }
+.play-btn svg { fill: #fff !important; width: 20px; height: 20px; }
+.player-info { flex-shrink: 0; min-width: 0; max-width: 180px; }
+.player-ch-title {
+  font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.player-ch-sub { font-size: 0.7rem; color: var(--text-muted); }
+.seek-area { flex: 1; display: flex; align-items: center; gap: 0.65rem; min-width: 0; }
+.seek-bar {
+  flex: 1; height: 4px; background: var(--border); border-radius: 2px;
+  cursor: pointer; position: relative; overflow: hidden;
+}
+.seek-bar:hover { height: 6px; }
+.seek-fill {
+  position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+  transition: width 0.1s linear;
+}
+.time-display { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+.speed-btn {
+  font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.45rem;
+  border-radius: 4px; color: var(--text-secondary); flex-shrink: 0;
+}
+.speed-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<!-- ── Upload Screen ── -->
+<div id="uploadScreen" class="upload-screen">
+  <div class="upload-brand">
+    <h1>pdf2audiobook</h1>
+    <p>Convert any PDF to a listenable audiobook</p>
+  </div>
+  <div class="upload-area" id="uploadArea">
+    <div class="upload-icon">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM6 20V4h5v7h7v9H6z"/></svg>
+    </div>
+    <h2>Drop a PDF here or click to browse</h2>
+    <p>Your audiobook streams as chapters are processed</p>
+    <input type="file" id="fileInput" accept=".pdf">
+  </div>
+  <div class="upload-status" id="uploadStatus"></div>
+</div>
+
+<!-- ── App Screen ── -->
+<div id="appScreen" class="app-screen hidden">
+
+  <header class="app-header">
+    <span class="header-brand">pdf2audiobook</span>
+    <span class="header-filename" id="headerFilename"></span>
+    <span class="header-status" id="headerStatus">Processing</span>
+    <button class="btn btn-accent" id="downloadAllBtn" disabled>
+      <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      Download All
+    </button>
+  </header>
+
+  <aside class="sidebar">
+    <div class="sidebar-title">Chapters</div>
+    <div id="chapterList"></div>
+  </aside>
+
+  <div class="content">
+    <div class="content-tabs">
+      <button class="tab-btn active" data-tab="text">Read Along</button>
+      <button class="tab-btn" data-tab="pdf">PDF View</button>
+    </div>
+    <div class="content-body">
+      <div class="text-reader" id="textReader">
+        <div class="reader-placeholder" id="readerPlaceholder">
+          <svg viewBox="0 0 24 24"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>
+          <p>Play a chapter to read along</p>
+        </div>
+        <div id="readerContent" class="hidden">
+          <h2 class="reader-title" id="readerTitle"></h2>
+          <div id="paragraphs"></div>
+        </div>
+      </div>
+      <div class="pdf-viewer hidden" id="pdfViewer">
+        <iframe id="pdfFrame"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <div class="player-bar empty" id="playerBar">
+    <span class="player-empty-msg">Select a chapter to begin listening</span>
+  </div>
+
+</div>
+
+<!-- Hidden audio element -->
+<audio id="audioEl" preload="auto"></audio>
+
+<script>
+/* ── SVG icon templates ── */
+const ICON = {
+  play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
+  prev: '<svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>',
+  download: '<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>',
+};
+
+/* ── State ── */
+let jobId = null;
+let pdfName = '';
+let chapters = [];
+let playingIndex = -1;
+let isPlaying = false;
+let readerParagraphs = [];
+let paragraphTimings = [];
+let activeTab = 'text';
+let playbackRate = 1;
+
+/* ── DOM refs ── */
+const $ = id => document.getElementById(id);
+const uploadScreen = $('uploadScreen');
+const appScreen = $('appScreen');
+const uploadArea = $('uploadArea');
+const fileInput = $('fileInput');
+const uploadStatus = $('uploadStatus');
+const headerFilename = $('headerFilename');
+const headerStatus = $('headerStatus');
+const downloadAllBtn = $('downloadAllBtn');
+const chapterList = $('chapterList');
+const textReader = $('textReader');
+const readerPlaceholder = $('readerPlaceholder');
+const readerContent = $('readerContent');
+const readerTitle = $('readerTitle');
+const paragraphsEl = $('paragraphs');
+const pdfViewer = $('pdfViewer');
+const pdfFrame = $('pdfFrame');
+const playerBar = $('playerBar');
+const audioEl = $('audioEl');
+
+/* ── Upload ── */
+uploadArea.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) doUpload(fileInput.files[0]); });
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault(); uploadArea.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.toLowerCase().endsWith('.pdf')) doUpload(f);
+});
+
+async function doUpload(file) {
+  pdfName = file.name;
+  uploadStatus.textContent = 'Uploading...';
+  uploadArea.style.pointerEvents = 'none'; uploadArea.style.opacity = '0.6';
+  const form = new FormData(); form.append('file', file);
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    jobId = data.job_id;
+    uploadStatus.textContent = 'Parsing PDF...';
+    switchToApp();
+    connectSSE(jobId);
+  } catch (err) {
+    uploadStatus.textContent = 'Upload failed: ' + err.message;
+    uploadArea.style.pointerEvents = ''; uploadArea.style.opacity = '';
+  }
+}
+
+function switchToApp() {
+  uploadScreen.classList.add('hidden');
+  appScreen.classList.remove('hidden');
+  headerFilename.textContent = pdfName;
+}
+
+/* ── SSE ── */
+function connectSSE(id) {
+  const es = new EventSource('/jobs/' + id + '/progress');
+  es.onmessage = e => handleEvent(JSON.parse(e.data));
+  es.onerror = () => { es.close(); setTimeout(() => { if (jobId === id) connectSSE(id); }, 3000); };
+}
+
+function handleEvent(p) {
+  const ev = p.event;
+  if (ev === 'snapshot' || ev === 'chapters_parsed') {
+    chapters = (p.chapters || []).map(c => ({ ...c, textReady: false }));
+    renderChapters();
+    if (ev === 'chapters_parsed') updateHeaderStatus('processing');
+  } else if (ev === 'chapter_stage') {
+    if (p.index < chapters.length) { chapters[p.index].status = p.stage; renderChapters(); }
+  } else if (ev === 'chapter_text_ready') {
+    if (p.index < chapters.length) chapters[p.index].textReady = true;
+  } else if (ev === 'chapter_audio_ready') {
+    if (p.index < chapters.length) { chapters[p.index].status = 'ready'; renderChapters(); }
+    if (playingIndex === -1) playChapter(p.index);
+    updateDownloadAllBtn();
+  } else if (ev === 'chapter_error') {
+    if (p.index < chapters.length) { chapters[p.index].status = 'error'; renderChapters(); }
+  } else if (ev === 'pipeline_complete') {
+    updateHeaderStatus('complete');
+    updateDownloadAllBtn();
+  } else if (ev === 'job_error') {
+    updateHeaderStatus('error');
+  }
+}
+
+function updateHeaderStatus(s) {
+  headerStatus.className = 'header-status' + (s === 'complete' ? ' complete' : '');
+  headerStatus.textContent = s === 'complete' ? 'Complete' : s === 'error' ? 'Error' : 'Processing';
+}
+
+function updateDownloadAllBtn() {
+  const readyCount = chapters.filter(c => c.status === 'ready').length;
+  downloadAllBtn.disabled = readyCount === 0;
+}
+
+/* ── Render Chapters ── */
+function renderChapters() {
+  chapterList.innerHTML = '';
+  chapters.forEach((ch, i) => {
+    const el = document.createElement('div');
+    const isReady = ch.status === 'ready';
+    const isCurrentlyPlaying = i === playingIndex;
+    el.className = 'ch-item' + (isReady ? ' clickable' : '') + (isCurrentlyPlaying ? ' playing' : '');
+
+    let indicator;
+    if (isCurrentlyPlaying && isPlaying) {
+      indicator = '<div class="audio-bars"><span></span><span></span><span></span></div>';
+    } else {
+      indicator = '<span class="ch-dot ' + ch.status + '"></span>';
+    }
+
+    let actions = '';
+    if (isReady) {
+      actions = '<div class="ch-actions">' +
+        '<button onclick="event.stopPropagation();downloadChapter(' + i + ')" title="Download">' + ICON.download + '</button>' +
+      '</div>';
+    }
+
+    el.innerHTML = indicator +
+      '<span class="ch-title">' + escHtml(ch.title || 'Chapter ' + (ch.index + 1)) + '</span>' +
+      (isReady ? '' : '<span class="ch-status">' + ch.status + '</span>') +
+      actions;
+
+    if (isReady) el.addEventListener('click', () => playChapter(i));
+    chapterList.appendChild(el);
+  });
+}
+
+/* ── Playback ── */
+function playChapter(idx) {
+  if (!jobId || idx >= chapters.length || chapters[idx].status !== 'ready') return;
+  playingIndex = idx;
+  audioEl.src = '/jobs/' + jobId + '/audio/' + idx;
+  audioEl.playbackRate = playbackRate;
+  audioEl.play();
+  renderPlayerBar();
+  renderChapters();
+  loadChapterText(idx);
+}
+
+function renderPlayerBar() {
+  if (playingIndex < 0) {
+    playerBar.className = 'player-bar empty';
+    playerBar.innerHTML = '<span class="player-empty-msg">Select a chapter to begin listening</span>';
+    return;
+  }
+  const ch = chapters[playingIndex];
+  playerBar.className = 'player-bar';
+  playerBar.innerHTML =
+    '<div class="transport">' +
+      '<button onclick="prevChapter()" title="Previous">' + ICON.prev + '</button>' +
+      '<button class="play-btn" id="playPauseBtn" onclick="togglePlay()">' + (isPlaying ? ICON.pause : ICON.play) + '</button>' +
+      '<button onclick="nextChapter()" title="Next">' + ICON.next + '</button>' +
+    '</div>' +
+    '<div class="player-info">' +
+      '<div class="player-ch-title">' + escHtml(ch.title || 'Chapter ' + (ch.index + 1)) + '</div>' +
+      '<div class="player-ch-sub">Chapter ' + (playingIndex + 1) + ' of ' + chapters.length + '</div>' +
+    '</div>' +
+    '<div class="seek-area">' +
+      '<span class="time-display" id="timeElapsed">0:00</span>' +
+      '<div class="seek-bar" id="seekBar"><div class="seek-fill" id="seekFill"></div></div>' +
+      '<span class="time-display" id="timeDuration">0:00</span>' +
+    '</div>' +
+    '<button class="speed-btn" id="speedBtn" onclick="cycleSpeed()">' + playbackRate + 'x</button>';
+
+  $('seekBar').addEventListener('click', seekTo);
+}
+
+function togglePlay() {
+  if (audioEl.paused) audioEl.play(); else audioEl.pause();
+}
+function prevChapter() {
+  for (let i = playingIndex - 1; i >= 0; i--) {
+    if (chapters[i].status === 'ready') { playChapter(i); return; }
+  }
+}
+function nextChapter() {
+  for (let i = playingIndex + 1; i < chapters.length; i++) {
+    if (chapters[i].status === 'ready') { playChapter(i); return; }
+  }
+}
+function seekTo(e) {
+  const bar = $('seekBar');
+  const ratio = (e.clientX - bar.getBoundingClientRect().left) / bar.offsetWidth;
+  audioEl.currentTime = Math.max(0, Math.min(1, ratio)) * audioEl.duration;
+}
+function cycleSpeed() {
+  const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+  const idx = (speeds.indexOf(playbackRate) + 1) % speeds.length;
+  playbackRate = speeds[idx];
+  audioEl.playbackRate = playbackRate;
+  const btn = $('speedBtn');
+  if (btn) btn.textContent = playbackRate + 'x';
+}
+
+/* Audio events */
+audioEl.addEventListener('play', () => { isPlaying = true; updatePlayBtn(); renderChapters(); });
+audioEl.addEventListener('pause', () => { isPlaying = false; updatePlayBtn(); renderChapters(); });
+audioEl.addEventListener('timeupdate', () => {
+  const fill = $('seekFill');
+  const elapsed = $('timeElapsed');
+  if (!fill || !audioEl.duration) return;
+  fill.style.width = (audioEl.currentTime / audioEl.duration * 100) + '%';
+  elapsed.textContent = fmtTime(audioEl.currentTime);
+  updateParagraphHighlight();
+});
+audioEl.addEventListener('loadedmetadata', () => {
+  const dur = $('timeDuration');
+  if (dur) dur.textContent = fmtTime(audioEl.duration);
+  computeParagraphTimings();
+});
+audioEl.addEventListener('ended', () => {
+  isPlaying = false; updatePlayBtn(); renderChapters();
+  nextChapter();
+});
+
+function updatePlayBtn() {
+  const btn = $('playPauseBtn');
+  if (btn) btn.innerHTML = isPlaying ? ICON.pause : ICON.play;
+}
+
+/* ── Text Reader ── */
+async function loadChapterText(idx) {
+  if (!jobId) return;
+  readerPlaceholder.classList.add('hidden');
+  readerContent.classList.remove('hidden');
+  readerTitle.textContent = chapters[idx].title || 'Chapter ' + (idx + 1);
+  paragraphsEl.innerHTML = '<p style="color:var(--text-muted)">Loading text...</p>';
+  try {
+    const res = await fetch('/jobs/' + jobId + '/text/' + idx);
+    if (!res.ok) { paragraphsEl.innerHTML = '<p style="color:var(--text-muted)">Text not available yet</p>'; return; }
+    const data = await res.json();
+    readerParagraphs = data.paragraphs || [];
+    paragraphsEl.innerHTML = '';
+    readerParagraphs.forEach((text, i) => {
+      const p = document.createElement('p');
+      p.className = 'paragraph';
+      p.dataset.idx = i;
+      p.textContent = text;
+      paragraphsEl.appendChild(p);
+    });
+    computeParagraphTimings();
+  } catch { paragraphsEl.innerHTML = '<p style="color:var(--text-muted)">Failed to load text</p>'; }
+}
+
+function computeParagraphTimings() {
+  if (!readerParagraphs.length || !audioEl.duration) { paragraphTimings = []; return; }
+  const total = readerParagraphs.reduce((s, p) => s + p.length, 0);
+  let cum = 0;
+  paragraphTimings = readerParagraphs.map(p => {
+    const start = (cum / total) * audioEl.duration;
+    cum += p.length;
+    return { start, end: (cum / total) * audioEl.duration };
+  });
+}
+
+function updateParagraphHighlight() {
+  if (!paragraphTimings.length) return;
+  const t = audioEl.currentTime;
+  const ps = paragraphsEl.querySelectorAll('.paragraph');
+  let activeIdx = 0;
+  for (let i = 0; i < paragraphTimings.length; i++) {
+    if (t >= paragraphTimings[i].start) activeIdx = i;
+  }
+  ps.forEach((p, i) => {
+    const wasActive = p.classList.contains('active');
+    p.classList.toggle('active', i === activeIdx);
+    if (i === activeIdx && !wasActive) {
+      p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
+/* ── Tabs ── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    textReader.classList.toggle('hidden', activeTab !== 'text');
+    pdfViewer.classList.toggle('hidden', activeTab !== 'pdf');
+    if (activeTab === 'pdf' && !pdfFrame.src && jobId) {
+      pdfFrame.src = '/jobs/' + jobId + '/pdf';
+    }
+  });
+});
+
+/* ── Downloads ── */
+function downloadChapter(idx) {
+  if (jobId) window.open('/jobs/' + jobId + '/download/' + idx, '_blank');
+}
+downloadAllBtn.addEventListener('click', () => {
+  if (jobId) window.open('/jobs/' + jobId + '/download-all', '_blank');
+});
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  else if (e.code === 'ArrowLeft') { audioEl.currentTime = Math.max(0, audioEl.currentTime - 10); }
+  else if (e.code === 'ArrowRight') { audioEl.currentTime = Math.min(audioEl.duration || 0, audioEl.currentTime + 10); }
+});
+
+/* ── Helpers ── */
+function fmtTime(s) {
+  if (!s || !isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+function escHtml(s) {
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+</script>
+</body>
+</html>

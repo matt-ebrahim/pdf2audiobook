@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pdf2audiobook"
+version = "0.1.0"
+description = "Convert PDFs to audiobooks via a 4-stage pipeline"
+requires-python = ">=3.9"
+dependencies = [
+    "pymupdf>=1.22",
+    "pydub>=0.25",
+    "spacy>=3.7",
+    "litellm>=1.50",
+    "docling>=2.50",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+kokoro = ["kokoro>=0.9", "soundfile"]
+chatterbox = ["chatterbox-tts"]
+openai-tts = ["openai>=1.0"]
+elevenlabs = ["elevenlabs>=1.0"]
+web = ["fastapi>=0.100", "uvicorn[standard]>=0.20", "python-multipart>=0.0.6"]
+all = [
+    "pdf2audiobook[kokoro,openai-tts,elevenlabs]",
+]
+
+[project.scripts]
+pdf2audiobook = "pdf2audiobook.cli:main"
+pdf2audiobook-web = "pdf2audiobook.webapp:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pdf2audiobook"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/pdf2audiobook"]

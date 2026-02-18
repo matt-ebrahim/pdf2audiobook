@@ -1,0 +1,46 @@
+[parse]
+# "auto" detects complexity, or force "docling" / "pymupdf"
+parser = "auto"
+# Number of pages to sample for auto-detection
+sample_pages = 5
+
+[clean]
+# LLM backend: "litellm" (default) or "none" (regex-only fallback)
+llm_backend = "litellm"
+# Any LiteLLM-supported model string:
+#   "gpt-4o-mini", "gpt-4o", "claude-sonnet-4-20250514",
+#   "gemini/gemini-2.0-flash", "ollama/llama3.2", etc.
+llm_model = "gpt-4o-mini"
+# Skip figures, tables, and references section entirely
+skip_figures = true
+skip_tables = true
+skip_references = true
+
+[chunk]
+# Max characters per chunk (400 for local TTS, 4096 for API TTS)
+max_chars = 400
+# Sentence splitter: "spacy"
+splitter = "spacy"
+# spaCy model name
+spacy_model = "en_core_web_sm"
+
+[synth]
+# TTS engine: "kokoro", "chatterbox", "openai", "elevenlabs"
+tts_engine = "kokoro"
+# Voice name (engine-specific)
+voice = "af_heart"
+# Output format: "m4b" or "mp3"
+output_format = "m4b"
+# Pause durations in milliseconds
+pause_sentence_ms = 300
+pause_paragraph_ms = 700
+pause_chapter_ms = 2000
+# Loudness normalization target
+target_lufs = -16
+# Number of parallel workers for TTS synthesis (0 = auto-detect)
+parallel_workers = 0
+
+[api_keys]
+openai = ""
+anthropic = ""
+elevenlabs = ""
