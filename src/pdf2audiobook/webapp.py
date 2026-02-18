@@ -29,13 +29,32 @@ _config: Any = None  # Loaded at startup
 
 
 def _load_global_config() -> Any:
-    """Load config from config.toml if present, otherwise defaults."""
+    """Load config from config.toml if present, otherwise defaults.
+
+    Also picks up API keys from environment variables so LLM-based
+    features (cleaning, executive summary) work out of the box when
+    the key is exported in the shell.
+    """
+    import os
+
     from pdf2audiobook.config import load_config
 
     for candidate in (Path("config.toml"), Path.home() / ".pdf2audiobook" / "config.toml"):
         if candidate.exists():
-            return load_config(candidate)
-    return load_config()
+            cfg = load_config(candidate)
+            break
+    else:
+        cfg = load_config()
+
+    # Seed API keys from environment if not already set via config file
+    if not cfg.api_keys.openai:
+        cfg.api_keys.openai = os.environ.get("OPENAI_API_KEY", "")
+    if not cfg.api_keys.anthropic:
+        cfg.api_keys.anthropic = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not cfg.api_keys.elevenlabs:
+        cfg.api_keys.elevenlabs = os.environ.get("ELEVENLABS_API_KEY", "")
+
+    return cfg
 
 
 def _get_config() -> Any:
