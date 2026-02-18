@@ -293,6 +293,13 @@ def _run_job(job: Job) -> None:
 
         chapters = parse_pdf(job.pdf_path, output_dir, config.parse, checkpoint, progress)
 
+        # Generate executive summary and inject as first chapter
+        from pdf2audiobook.summary import generate_and_inject_summary
+
+        chapters = generate_and_inject_summary(
+            chapters, output_dir, config.clean, config.api_keys, checkpoint, progress
+        )
+
         job.chapters = [
             ChapterInfo(index=ch.index, title=ch.title) for ch in chapters
         ]

@@ -40,14 +40,23 @@ def run_pipeline(
     else:
         chapters = parse_pdf(pdf_path, output_dir, config.parse, checkpoint, progress)
 
-    total = len(chapters)
-    progress.done(f"Parsed {total} chapter(s)")
+    progress.done(f"Parsed {len(chapters)} chapter(s)")
 
     for ch in chapters:
         progress.detail(
             f"  Ch {ch.index}: {ch.title} "
             f"(pages {ch.start_page}-{ch.end_page}, {len(ch.sections)} sections)"
         )
+
+    # ── Stage 1b: Executive Summary ──────────────────────────
+    progress.stage("1b — Executive Summary")
+
+    from pdf2audiobook.summary import generate_and_inject_summary
+
+    chapters = generate_and_inject_summary(
+        chapters, output_dir, config.clean, config.api_keys, checkpoint, progress
+    )
+    total = len(chapters)
 
     # ── Stages 2-4: Streaming Clean → Chunk → Synthesize ───
     progress.stage("2-4 — Streaming pipeline (clean → chunk → synth)")
